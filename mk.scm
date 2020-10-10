@@ -18,25 +18,13 @@
   (syntax-rules ()
     ((_ (x) g ...) (run #f (x) g ...))))
 
-(define-syntax rhs
-  (syntax-rules ()
-    ((_ x) (cdr x))))
+(define lhs (lambda (pr) (car pr)))
 
-(define-syntax lhs
-  (syntax-rules ()
-    ((_ x) (car x))))
+(define rhs (lambda (pr) (cdr pr)))
 
-(define-syntax size-s
-  (syntax-rules ()
-    ((_ x) (length x))))
+(define var (lambda (dummy) (vector dummy)))
 
-(define-syntax var
-  (syntax-rules ()
-    ((_ x) (vector x))))
-
-(define-syntax var?
-  (syntax-rules ()
-    ((_ x) (vector? x))))
+(define var? (lambda (x) (vector? x)))
 
 (define c->S (lambda (c) (car c)))
 
@@ -106,7 +94,7 @@
     (let ((v (walk v s)))
       (cond
         ((var? v)
-         (ext-s v (reify-name (size-s s)) s))
+         (ext-s v (reify-name (length s)) s))
         ((pair? v) (reify-s (cdr v)
                      (reify-s (car v) s)))
         (else s)))))
@@ -123,17 +111,19 @@
         (let ((v (walk* v S)))
           (list (walk* v (reify-s v empty-s)) '()))))))
 
-(define-syntax mzero 
-  (syntax-rules () ((_) #f)))
+; Types of infinity stream
+; zero
+(define mzero (lambda () #f))
 
+; one
+(define unit (lambdag@ (c) c))
+
+; one or more
+(define choice (lambda (c f) (cons c f)))
+
+; incomplete stream
 (define-syntax inc 
   (syntax-rules () ((_ e) (lambdaf@ () e))))
-
-(define-syntax unit 
-  (syntax-rules () ((_ a) a)))
-
-(define-syntax choice 
-  (syntax-rules () ((_ a f) (cons a f))))
  
 (define-syntax case-inf
   (syntax-rules ()
