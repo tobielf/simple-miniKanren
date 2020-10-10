@@ -2,8 +2,13 @@
 ;;; Generated at 2007-10-25 15:24:42
 
 (define-syntax lambdag@
-  (syntax-rules ()
-    ((_ (p) e) (lambda (p) e))))
+  (syntax-rules (:)
+    ((_ (c) e) (lambda (c) e))
+    ((_ (c : S N) e)
+     (lambda (c)
+       (let ((S (c->S c))
+             (N (c->N c)))
+         e)))))
 
 (define-syntax lambdaf@
   (syntax-rules ()
@@ -33,7 +38,13 @@
   (syntax-rules ()
     ((_ x) (vector? x))))
 
+(define c->S (lambda (c) (car c)))
+
+(define c->N (lambda (c) (cadr c)))
+
 (define empty-s '())
+
+(define empty-c '(() (0)))
 
 (define walk
   (lambda (u S)
@@ -106,9 +117,11 @@
       (string-append "_" "." (number->string n)))))
 
 (define reify
-  (lambda (v s)
-    (let ((v (walk* v s)))
-      (walk* v (reify-s v empty-s)))))
+  (lambda (v)
+    (lambda (c)
+      (let ((S (c->S c)))
+        (let ((v (walk* v S)))
+          (list (walk* v (reify-s v empty-s)) '()))))))
 
 (define-syntax mzero 
   (syntax-rules () ((_) #f)))
@@ -135,15 +148,18 @@
          (else (let ((a (car a-inf)) (f (cdr a-inf))) 
                  e3)))))))
 
+(define empty-f (lambdaf@ () (mzero)))
+
 (define-syntax run
   (syntax-rules ()
     ((_ n (x) g0 g ...)
      (take n
        (lambdaf@ ()
          ((fresh (x) g0 g ... 
-            (lambdag@ (s)
-              (cons (reify x s) '())))
-          empty-s))))))
+            (lambdag@ (final-c)
+              (let ((z ((reify x) final-c)))
+                (choice z empty-f))))
+          empty-c))))))
  
 (define take
   (lambda (n f)
@@ -159,8 +175,16 @@
 
 (define ==
   (lambda (u v)
-    (lambdag@ (s)
-      (unify u v s))))
+    (lambdag@ (c : S N)
+      (cond
+        ((unify u v S) => (post-unify-== c S N))
+        (else (mzero)))
+      )))
+
+(define post-unify-==
+  (lambda (c S N) 
+    (lambda (S+) 
+      (unit (list S+ N)))))
  
 (define-syntax fresh
   (syntax-rules ()
