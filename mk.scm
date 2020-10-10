@@ -284,3 +284,24 @@
     (condu
       (g succeed)
       ((== #f #f) fail))))
+
+; A negation (no) is a procedure that
+(define no
+  ; takes in a goal
+  (lambda (goal)
+    ; and a sequence of subsitution, produces the new subsitution as follows
+    (lambdag@ (c : S N)
+      ; Flip the odd/even negation counter.
+      ; 0/1 means there are even/odd number of negations. 
+      (let ((newN (list (- 1 (car N)))))
+        ; Compute the goal to see if we can find out at least one proof/subsitution.
+        ; The assumption here is (take) has finite steps, so that it will terminate eventually.
+        (let ((result (take 1 (lambdaf@() (goal (list S newN))))))
+          ; Negation as failure.
+          (if (null? result)
+              ; Succeed if we failed to prove the goal.
+              (unit c)
+              ; Fail if we found at least one goal.
+              (mzero))))
+    )
+  ))
