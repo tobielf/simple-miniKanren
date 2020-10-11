@@ -109,7 +109,7 @@
     (lambda (c)
       (let ((S (c->S c)))
         (let ((v (walk* v S)))
-          (list (walk* v (reify-s v empty-s)) '()))))))
+          (walk* v (reify-s v empty-s)))))))
 
 ; Types of infinity stream
 ; zero
@@ -160,7 +160,7 @@
         ((f) (take n f))
         ((a) a)
         ((a f)
-         (cons (car a)
+         (cons a
            (take (and n (- n 1)) f)))))))
 
 (define ==
