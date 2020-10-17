@@ -4,10 +4,11 @@
 (define-syntax lambdag@
   (syntax-rules (:)
     ((_ (c) e) (lambda (c) e))
-    ((_ (c : S N) e)
+    ((_ (c : S N F) e)
      (lambda (c)
        (let ((S (c->S c))
-             (N (c->N c)))
+             (N (c->N c))
+             (F (c->F c)))
          e)))))
 
 (define-syntax lambdaf@
@@ -30,9 +31,11 @@
 
 (define c->N (lambda (c) (cadr c)))
 
+(define c->F (lambda (c) (caddr c)))
+
 (define empty-s '())
 
-(define empty-c '(() (0)))
+(define empty-c '(() (0) ()))
 
 (define walk
   (lambda (u S)
@@ -158,23 +161,23 @@
       (case-inf (f)
         (() '())
         ((f) (take n f))
-        ((a) a)
+        ((a) (cons a '()))
         ((a f)
          (cons a
            (take (and n (- n 1)) f)))))))
 
 (define ==
   (lambda (u v)
-    (lambdag@ (c : S N)
+    (lambdag@ (c : S N F)
       (cond
-        ((unify u v S) => (post-unify-== c S N))
+        ((unify u v S) => (post-unify-== c S N F))
         (else (mzero)))
       )))
 
 (define post-unify-==
-  (lambda (c S N) 
+  (lambda (c S N F) 
     (lambda (S+) 
-      (unit (list S+ N)))))
+      (unit (list S+ N F)))))
  
 (define-syntax fresh
   (syntax-rules ()
@@ -280,13 +283,13 @@
   ; takes in a goal
   (lambda (goal)
     ; and a sequence of subsitution, produces the new subsitution as follows
-    (lambdag@ (c : S N)
+    (lambdag@ (c : S N F)
       ; Flip the odd/even negation counter.
       ; 0/1 means there are even/odd number of negations. 
-      (let ((newN (list (- 1 (car N)))))
+      (let ((newN (- 1 (car N))))
         ; Compute the goal to see if we can find out at least one proof/subsitution.
         ; The assumption here is (take) has finite steps, so that it will terminate eventually.
-        (let ((result (take 1 (lambdaf@() (goal (list S newN))))))
+        (let ((result (take 1 (lambdaf@() (goal (list S (cons newN N) F))))))
           ; Negation as failure.
           (if (null? result)
               ; Succeed if we failed to prove the goal.
