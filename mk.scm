@@ -293,8 +293,21 @@
           ; Negation as failure.
           (if (null? result)
               ; Succeed if we failed to prove the goal.
-              (unit c)
-              ; Fail if we found at least one goal.
-              (mzero))))
+              (unit (list S N '(()) ))
+              (let ((F (c->F (car result)))
+                    (nS (c->S (car result))))
+                ; Fail if we found at least one goal.
+                (cond ((and (not (null? nS)) (= (length N) 1))
+                           ; Fail if we found at least one goal.
+                           (mzero))
+                      ((not (null? F))
+                       (unit (list (car F) N (list nS))))
+                      ((not (null? nS))
+                       (unit (list '() N `(,nS) )))
+                      ((null? nS)
+                       (unit (list (car F) N '(()) )))
+                      (else (error "unexpected result" result)))
+              )
+          )))
     )
   ))
