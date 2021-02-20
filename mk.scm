@@ -358,51 +358,68 @@
 
        ))))
 
-; A negation (no) is a procedure that
-(define no
-  ; takes in a goal
-  (lambda (goal)
-    ; and a sequence of subsitution, produces the new subsitution as follows
-    (lambdag@ (c : S N F)
-      ; Add the odd/even negation counter.
-      (let ((newN (+ 1 N)))
-      ; 0/1 means there are even/odd number of negations. 
-        (let ((result (take 1 (lambdaf@() (goal (list S newN F))))))
-            (display c)
-            (newline)
-            ; Negation as failure.
-            (if (null? result)
-              ;Succeed if we failed to prove the goal.
-              (unit c)
-              ; Fail if we found at least one goal.
-              (mzero)
+;; A negation (no) is a procedure that
+;(define no
+;  ; takes in a goal
+;  (lambda (goal)
+;    ; and a sequence of subsitution, produces the new subsitution as follows
+;    (lambdag@ (c : S N F)
+;      ; Add the odd/even negation counter.
+;      (let ((newN (+ 1 N)))
+;      ; 0/1 means there are even/odd number of negations. 
+;        (let ((result (take 1 (lambdaf@() (goal (list S newN F))))))
+;            (display c)
+;            (newline)
+;            ; Negation as failure.
+;            (if (null? result)
+;              ;Succeed if we failed to prove the goal.
+;              (unit c)
+;              ; Fail if we found at least one goal.
+;              (mzero)
+;            )
+;        )
+;      )
+;      ;(let ((newN (- 1 (car N))))
+;      ;  ; Compute the goal to see if we can find out at least one proof/subsitution.
+;      ;  ; The assumption here is (take) has finite steps, so that it will terminate eventually.
+;      ;  (let ((result (take 1 (lambdaf@() (goal (list S (cons newN N) F))))))
+;      ;    ; Negation as failure.
+;      ;    (if (null? result)
+;      ;        ; Succeed if we failed to prove the goal.
+;      ;        (unit (list S N '(()) ))
+;      ;        (let ((F (c->F (car result)))
+;      ;              (nS (c->S (car result))))
+;      ;          ; Fail if we found at least one goal.
+;      ;          (cond ((and (not (null? nS)) (= (length N) 1))
+;      ;                     ; Fail if we found at least one goal.
+;      ;                     (mzero))
+;      ;                ((not (null? F))
+;      ;                 (unit (list (car F) N (list nS))))
+;      ;                ((not (null? nS))
+;      ;                 (unit (list '() N `(,nS) )))
+;      ;                ((null? nS)
+;      ;                 (unit (list (car F) N '(()) )))
+;      ;                (else (error "unexpected result" result)))
+;      ;        )
+;      ;    )))
+;    )
+;  ))
+
+(define-syntax no
+    (syntax-rules ()
+      ((no (name args ...))
+        (let ((alt_name (string-append "not_" 
+                        (symbol->string 'name))))
+          (lambdag@ (c : S N F)
+            (let ((newN (+ 1 N)))
+              (let ((newC (list S newN F)))
+                (display newN)
+                (if (even? newN)
+                    ((name args ...) newC)
+                    (begin (display alt_name)
+                           (newline)
+                         (((eval (string->symbol alt_name)) args ...) newC))
+                )
+              )
             )
-        )
-      )
-      ;(let ((newN (- 1 (car N))))
-      ;  ; Compute the goal to see if we can find out at least one proof/subsitution.
-      ;  ; The assumption here is (take) has finite steps, so that it will terminate eventually.
-      ;  (let ((result (take 1 (lambdaf@() (goal (list S (cons newN N) F))))))
-      ;    ; Negation as failure.
-      ;    (if (null? result)
-      ;        ; Succeed if we failed to prove the goal.
-      ;        (unit (list S N '(()) ))
-      ;        (let ((F (c->F (car result)))
-      ;              (nS (c->S (car result))))
-      ;          ; Fail if we found at least one goal.
-      ;          (cond ((and (not (null? nS)) (= (length N) 1))
-      ;                     ; Fail if we found at least one goal.
-      ;                     (mzero))
-      ;                ((not (null? F))
-      ;                 (unit (list (car F) N (list nS))))
-      ;                ((not (null? nS))
-      ;                 (unit (list '() N `(,nS) )))
-      ;                ((null? nS)
-      ;                 (unit (list (car F) N '(()) )))
-      ;                (else (error "unexpected result" result)))
-      ;        )
-      ;    )))
-    )
-  ))
-
-
+          )))))
