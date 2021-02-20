@@ -3,13 +3,13 @@
 
 (define-syntax lambdag@
   (syntax-rules (:)
-    ((_ (c) e) (lambda (c) e))
-    ((_ (c : S N F) e)
+    ((_ (c) e ...) (lambda (c) e ...))
+    ((_ (c : S N F) e ...)
      (lambda (c)
        (let ((S (c->S c))
              (N (c->N c))
              (F (c->F c)))
-         e)))))
+         e ...)))))
 
 (define-syntax lambdaf@
   (syntax-rules ()
@@ -35,7 +35,7 @@
 
 (define empty-s '())
 
-(define empty-c '(() (0) ()))
+(define empty-c '(() 0 () ))
 
 (define walk
   (lambda (u S)
@@ -174,6 +174,14 @@
         (else (mzero)))
       )))
 
+(define not_==
+  (lambda (u v)
+    (lambdag@ (c : S N F)
+      (cond
+        ((unify u v S) => (lambda (s) (mzero)))
+        (else (unit c)))
+      )))
+
 (define post-unify-==
   (lambda (c S N F) 
     (lambda (S+) 
@@ -278,36 +286,123 @@
       (g succeed)
       ((== #f #f) fail))))
 
+;;; Representing sets as unordered lists.
+; O(n) complexity.
+(define (element-of-set? x set)
+  (cond ((null? set) #f)
+        ((equal? x (car set)) #t)
+        (else (element-of-set? x (cdr set)))))
+
+; O(1) complexity.
+(define (adjoin-set x set) (cons x set))
+
+(define-syntax def-asp-rule
+    (syntax-rules ()
+      ((_ (name args ...) exp ...)
+       (begin
+         ; [ToDo] Add rule to tracking set.
+         ;(display `name)
+         ; [ToDo] Define a transformed rule.
+         (define name (lambda (args ...)
+           ; [ToDo] Mark rule has been executed.
+           ;(display `name)
+           ; Coinduction and tabling.
+           (let ((argv (list args ...))
+                  (alt_name (string-append "not_" 
+                            (symbol->string `name))))
+             (lambdag@ (c : S N F)
+             ; Inspect calling stack.
+             ;(display S)
+             (let ((key (map (lambda (arg)
+                                (walk arg S)) argv) ))
+               (if (element-of-set? (list (string->symbol alt_name) key) F)
+                   (mzero)
+                   ; Expand calling stack.
+                   ((fresh () exp ...) (list S N (adjoin-set (list (string->symbol alt_name) key) F))))
+             )
+             ; Positive loop (Tabling)
+             ; Negative loop (Even co-inductive success)
+             ; Negative loop (Odd co-inductive failure)
+             ))
+         ))
+
+       ))))
+
+(define-syntax def-asp-complement-rule
+    (syntax-rules ()
+      ((_ (name args ...) exp ...)
+       (begin
+         ; [ToDo] Add rule to tracking set.
+         ;(display `name)
+         ; [ToDo] Define a transformed rule.
+         (define name (lambda (args ...)
+           ; [ToDo] Mark rule has been executed.
+           ;(display `name)
+           ; Coinduction and tabling.
+           (let ((argv (list args ...)))
+             (lambdag@ (c : S N F)
+             ; Inspect calling stack.
+             ;(display S)
+             (let ((key (map (lambda (arg)
+                                (walk arg S)) argv) ))
+               (if (element-of-set? (list `name key) F)
+                   (mzero)
+                   ; Expand calling stack.
+                   ((fresh () exp ...) (list S N (adjoin-set (list `name key) F))))
+             )
+             ; Positive loop (Tabling)
+             ; Negative loop (Even co-inductive success)
+             ; Negative loop (Odd co-inductive failure)
+             ))
+         ))
+
+       ))))
+
 ; A negation (no) is a procedure that
 (define no
   ; takes in a goal
   (lambda (goal)
     ; and a sequence of subsitution, produces the new subsitution as follows
     (lambdag@ (c : S N F)
-      ; Flip the odd/even negation counter.
+      ; Add the odd/even negation counter.
+      (let ((newN (+ 1 N)))
       ; 0/1 means there are even/odd number of negations. 
-      (let ((newN (- 1 (car N))))
-        ; Compute the goal to see if we can find out at least one proof/subsitution.
-        ; The assumption here is (take) has finite steps, so that it will terminate eventually.
-        (let ((result (take 1 (lambdaf@() (goal (list S (cons newN N) F))))))
-          ; Negation as failure.
-          (if (null? result)
-              ; Succeed if we failed to prove the goal.
-              (unit (list S N '(()) ))
-              (let ((F (c->F (car result)))
-                    (nS (c->S (car result))))
-                ; Fail if we found at least one goal.
-                (cond ((and (not (null? nS)) (= (length N) 1))
-                           ; Fail if we found at least one goal.
-                           (mzero))
-                      ((not (null? F))
-                       (unit (list (car F) N (list nS))))
-                      ((not (null? nS))
-                       (unit (list '() N `(,nS) )))
-                      ((null? nS)
-                       (unit (list (car F) N '(()) )))
-                      (else (error "unexpected result" result)))
-              )
-          )))
+        (let ((result (take 1 (lambdaf@() (goal (list S newN F))))))
+            (display c)
+            (newline)
+            ; Negation as failure.
+            (if (null? result)
+              ;Succeed if we failed to prove the goal.
+              (unit c)
+              ; Fail if we found at least one goal.
+              (mzero)
+            )
+        )
+      )
+      ;(let ((newN (- 1 (car N))))
+      ;  ; Compute the goal to see if we can find out at least one proof/subsitution.
+      ;  ; The assumption here is (take) has finite steps, so that it will terminate eventually.
+      ;  (let ((result (take 1 (lambdaf@() (goal (list S (cons newN N) F))))))
+      ;    ; Negation as failure.
+      ;    (if (null? result)
+      ;        ; Succeed if we failed to prove the goal.
+      ;        (unit (list S N '(()) ))
+      ;        (let ((F (c->F (car result)))
+      ;              (nS (c->S (car result))))
+      ;          ; Fail if we found at least one goal.
+      ;          (cond ((and (not (null? nS)) (= (length N) 1))
+      ;                     ; Fail if we found at least one goal.
+      ;                     (mzero))
+      ;                ((not (null? F))
+      ;                 (unit (list (car F) N (list nS))))
+      ;                ((not (null? nS))
+      ;                 (unit (list '() N `(,nS) )))
+      ;                ((null? nS)
+      ;                 (unit (list (car F) N '(()) )))
+      ;                (else (error "unexpected result" result)))
+      ;        )
+      ;    )))
     )
   ))
+
+
