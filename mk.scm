@@ -305,61 +305,59 @@
 ; Unavoidable OLON in the program.
 
 (define-syntax def-asp-rule
-    (syntax-rules ()
-      ((_ (name args ...) exp ...)
-       (begin
-         ; [ToDo] Add rule to tracking set.
-         ;(display `name)
-         ; [ToDo] Define a transformed rule. [def-asp-complement-rule]
-         (define name (lambda (args ...)
-           ; [ToDo] Mark rule has been executed.
-           ;(display `name)
-           ; Coinduction and tabling.
-           (let ((argv (list args ...))
-                  (alt_name (string-append "co_" 
-                            (symbol->string `name))))
-             (lambdag@ (c : S N F)
-             ; Inspect calling stack.
-             ;(display S)
-             (let ((key (map (lambda (arg)
+  (syntax-rules ()
+    ((_ (name args ...) exp ...)
+      (begin
+        ; [ToDo] Add rule to tracking set.
+        ;(display `name)
+        ; [ToDo] Define a transformed rule. [def-asp-complement-rule]
+        (define name (lambda (args ...)
+          ; [ToDo] Mark rule has been executed.
+          ;(display `name)
+          ; Coinduction and tabling.
+          (let ((argv (list args ...))
+                (alt_name (string-append "co_" 
+                          (symbol->string `name))))
+            (lambdag@ (c : S N F)
+              ; Inspect calling stack.
+              ;(display S)
+              (let ((key (map (lambda (arg)
                                 (walk arg S)) argv) ))
-               (let ((record (element-of-set? (list (string->symbol alt_name) key) F)))
-                 (if (and record #t) 
-                     (let ((diff (- N (get-value record))))
-                        (if (even? diff)
-                            ; Positive loop (Tabling)
-                            ; Negative loop (Even co-inductive success)
-                            (unit c)
-                            ; Negative loop (Odd co-inductive failure)
-                            (mzero)))
-                     ; Expand calling stack.
-                     ((if (even? N)
-                       (begin (display `name ) (fresh () exp ...))
-                       (begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
+                (let ((record (element-of-set? (list (string->symbol alt_name) key) F)))
+                  (if (and record #t) 
+                    (let ((diff (- N (get-value record))))
+                      (if (even? diff)
+                        ; Positive loop (Tabling)
+                        ; Negative loop (Even co-inductive success)
+                        (unit c)
+                        ; Negative loop (Odd co-inductive failure)
+                        (mzero)))
+                    ; Expand calling stack.
+                    ((if (even? N)
+                      (begin (display `name ) (fresh () exp ...))
+                      (begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
                      ) (list S N (adjoin-set 
                                     (make-record
                                       (list (string->symbol alt_name) key)
                                       N) F)))
                   )
-               )
-             )
-             ))
-         ))
-
+                )
+              )
+            ))
+          ))
        ))))
 
 (define-syntax def-asp-complement-rule
-    (syntax-rules ()
-      ((_ (name args ...) exp ...)
-       (begin
-         (define name (lambda (args ...)
-           (lambdag@ (c : S N F)
-              ((fresh () exp ...)
+  (syntax-rules ()
+    ((_ (name args ...) exp ...)
+      (begin
+        (define name (lambda (args ...)
+          (lambdag@ (c : S N F)
+            ((fresh () exp ...)
                     (list S N F))
-           )
-         ))
-
-       ))))
+          )
+        ))
+      ))))
 
 ;; A negation (no) is a procedure that
 ;(define no
