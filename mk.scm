@@ -169,18 +169,15 @@
 (define ==
   (lambda (u v)
     (lambdag@ (c : S N F)
-      (cond
-        ((unify u v S) => (post-unify-== c S N F))
-        (else (mzero)))
-      )))
-
-(define not_==
-  (lambda (u v)
-    (lambdag@ (c : S N F)
-      (cond
-        ((unify u v S) => (lambda (s) (mzero)))
-        (else (unit c)))
-      )))
+      (if (even? N)
+        (cond
+          ((unify u v S) => (post-unify-== c S N F))
+          (else (mzero)))
+        (cond
+          ((unify u v S) => (lambda (s) (mzero)))
+          (else (unit c)))
+      )  
+    )))
 
 (define post-unify-==
   (lambda (c S N F) 
@@ -290,11 +287,22 @@
 ; O(n) complexity.
 (define (element-of-set? x set)
   (cond ((null? set) #f)
-        ((equal? x (car set)) #t)
+        ((equal? x (get-key (car set))) (car set))
         (else (element-of-set? x (cdr set)))))
 
 ; O(1) complexity.
 (define (adjoin-set x set) (cons x set))
+
+(define (make-record key value)
+  (cons key value))
+
+(define (get-key record)
+  (car record))
+
+(define (get-value record)
+  (cdr record))
+
+; Unavoidable OLON in the program.
 
 (define-syntax def-asp-rule
     (syntax-rules ()
@@ -302,27 +310,39 @@
        (begin
          ; [ToDo] Add rule to tracking set.
          ;(display `name)
-         ; [ToDo] Define a transformed rule.
+         ; [ToDo] Define a transformed rule. [def-asp-complement-rule]
          (define name (lambda (args ...)
            ; [ToDo] Mark rule has been executed.
            ;(display `name)
            ; Coinduction and tabling.
            (let ((argv (list args ...))
-                  (alt_name (string-append "not_" 
+                  (alt_name (string-append "co_" 
                             (symbol->string `name))))
              (lambdag@ (c : S N F)
              ; Inspect calling stack.
              ;(display S)
              (let ((key (map (lambda (arg)
                                 (walk arg S)) argv) ))
-               (if (element-of-set? (list (string->symbol alt_name) key) F)
-                   (mzero)
-                   ; Expand calling stack.
-                   ((fresh () exp ...) (list S N (adjoin-set (list (string->symbol alt_name) key) F))))
+               (let ((record (element-of-set? (list (string->symbol alt_name) key) F)))
+                 (if (and record #t) 
+                     (let ((diff (- N (get-value record))))
+                        (if (even? diff)
+                            ; Positive loop (Tabling)
+                            ; Negative loop (Even co-inductive success)
+                            (unit c)
+                            ; Negative loop (Odd co-inductive failure)
+                            (mzero)))
+                     ; Expand calling stack.
+                     ((if (even? N)
+                       (begin (display `name ) (fresh () exp ...))
+                       (begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
+                     ) (list S N (adjoin-set 
+                                    (make-record
+                                      (list (string->symbol alt_name) key)
+                                      N) F)))
+                  )
+               )
              )
-             ; Positive loop (Tabling)
-             ; Negative loop (Even co-inductive success)
-             ; Negative loop (Odd co-inductive failure)
              ))
          ))
 
@@ -332,28 +352,11 @@
     (syntax-rules ()
       ((_ (name args ...) exp ...)
        (begin
-         ; [ToDo] Add rule to tracking set.
-         ;(display `name)
-         ; [ToDo] Define a transformed rule.
          (define name (lambda (args ...)
-           ; [ToDo] Mark rule has been executed.
-           ;(display `name)
-           ; Coinduction and tabling.
-           (let ((argv (list args ...)))
-             (lambdag@ (c : S N F)
-             ; Inspect calling stack.
-             ;(display S)
-             (let ((key (map (lambda (arg)
-                                (walk arg S)) argv) ))
-               (if (element-of-set? (list `name key) F)
-                   (mzero)
-                   ; Expand calling stack.
-                   ((fresh () exp ...) (list S N (adjoin-set (list `name key) F))))
-             )
-             ; Positive loop (Tabling)
-             ; Negative loop (Even co-inductive success)
-             ; Negative loop (Odd co-inductive failure)
-             ))
+           (lambdag@ (c : S N F)
+              ((fresh () exp ...)
+                    (list S N F))
+           )
          ))
 
        ))))
@@ -406,20 +409,14 @@
 ;  ))
 
 (define-syntax no
-    (syntax-rules ()
-      ((no (name args ...))
-        (let ((alt_name (string-append "not_" 
-                        (symbol->string 'name))))
-          (lambdag@ (c : S N F)
-            (let ((newN (+ 1 N)))
-              (let ((newC (list S newN F)))
-                (display newN)
-                (if (even? newN)
-                    ((name args ...) newC)
-                    (begin (display alt_name)
-                           (newline)
-                         (((eval (string->symbol alt_name)) args ...) newC))
-                )
-              )
-            )
-          )))))
+  (syntax-rules ()
+    ((no (name args ...))
+      (lambdag@ (c : S N F)
+        (let ((newN (+ 1 N)))
+          (let ((newC (list S newN F)))
+            (display newN)
+            ((name args ...) newC)
+          )
+        )
+      )
+    )))
