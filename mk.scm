@@ -3,11 +3,10 @@
 
 (define-syntax lambdag@
   (syntax-rules (:)
-    ((_ (c) e ...) (lambda (c) e ...))
-    ((_ (c : S N F) e ...)
-     (lambda (c)
+    ((_ (n c) e ...) (lambda (n c) e ...))
+    ((_ (n c : S F) e ...)
+     (lambda (n c)
        (let ((S (c->S c))
-             (N (c->N c))
              (F (c->F c)))
          e ...)))))
 
@@ -29,13 +28,11 @@
 
 (define c->S (lambda (c) (car c)))
 
-(define c->N (lambda (c) (cadr c)))
-
-(define c->F (lambda (c) (caddr c)))
+(define c->F (lambda (c) (cadr c)))
 
 (define empty-s '())
 
-(define empty-c '(() 0 () ))
+(define empty-c '(() ()))
 
 (define walk
   (lambda (u S)
@@ -119,7 +116,7 @@
 (define mzero (lambda () #f))
 
 ; one
-(define unit (lambdag@ (c) c))
+(define unit (lambdag@ (n c) c))
 
 ; one or more
 (define choice (lambda (c f) (cons c f)))
@@ -149,10 +146,10 @@
      (take n
        (lambdaf@ ()
          ((fresh (x) g0 g ... 
-            (lambdag@ (final-c)
+            (lambdag@ (dummy final-c)
               (let ((z ((reify x) final-c)))
                 (choice z empty-f))))
-          empty-c))))))
+          0 empty-c))))))
  
 (define take
   (lambda (n f)
@@ -168,51 +165,51 @@
 
 (define ==
   (lambda (u v)
-    (lambdag@ (c : S N F)
-      (if (even? N)
+    (lambdag@ (n c : S F)
+      (if (even? n)
         (cond
-          ((unify u v S) => (post-unify-== c S N F))
+          ((unify u v S) => (post-unify-== c S F))
           (else (mzero)))
         (cond
           ((unify u v S) => (lambda (s) (mzero)))
-          (else (unit c)))
+          (else (unit n c)))
       )  
     )))
 
 (define post-unify-==
-  (lambda (c S N F) 
+  (lambda (c S F) 
     (lambda (S+) 
-      (unit (list S+ N F)))))
+      (unit 0 (list S+ F)))))
  
 (define-syntax fresh
   (syntax-rules ()
     ((_ (x ...) g0 g ...)
-     (lambdag@ (s)
+     (lambdag@ (n s)
        (inc
          (let ((x (var 'x)) ...)
-           (bind* (g0 s) g ...)))))))
+           (bind* n (g0 n s) g ...)))))))
  
 (define-syntax bind*
   (syntax-rules ()
-    ((_ e) e)
-    ((_ e g0 g ...) (bind* (bind e g0) g ...))))
+    ((_ n e) e)
+    ((_ n e g0 g ...) (bind* n (bind n e g0) g ...))))
  
 (define bind
-  (lambda (a-inf g)
+  (lambda (n a-inf g)
     (case-inf a-inf
       (() (mzero))
-      ((f) (inc (bind (f) g)))
-      ((a) (g a))
-      ((a f) (mplus (g a) (lambdaf@ () (bind (f) g)))))))
+      ((f) (inc (bind n (f) g)))
+      ((a) (g n a))
+      ((a f) (mplus (g n a) (lambdaf@ () (bind n (f) g)))))))
 
 (define-syntax conde
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (s) 
+     (lambdag@ (n s) 
        (inc 
          (mplus* 
-           (bind* (g0 s) g ...)
-           (bind* (g1 s) g^ ...) ...))))))
+           (bind* n (g0 n s) g ...)
+           (bind* n (g1 n s) g^ ...) ...))))))
  
 (define-syntax mplus*
   (syntax-rules ()
@@ -231,47 +228,47 @@
 (define-syntax conda
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (s)
+     (lambdag@ (n s)
        (inc
-         (ifa ((g0 s) g ...)
-              ((g1 s) g^ ...) ...))))))
+         (ifa n ((g0 n s) g ...)
+              ((g1 n s) g^ ...) ...))))))
  
 (define-syntax ifa
   (syntax-rules ()
-    ((_) (mzero))
-    ((_ (e g ...) b ...)
+    ((_ n) (mzero))
+    ((_ n (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
-         (() (ifa b ...))
+         (() (ifa n b ...))
          ((f) (inc (loop (f))))
-         ((a) (bind* a-inf g ...))
-         ((a f) (bind* a-inf g ...)))))))
+         ((a) (bind* n a-inf g ...))
+         ((a f) (bind* n a-inf g ...)))))))
 
 (define-syntax condu
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (s)
+     (lambdag@ (n s)
        (inc
-         (ifu ((g0 s) g ...)
-              ((g1 s) g^ ...) ...))))))
+         (ifu n ((g0 n s) g ...)
+              ((g1 n s) g^ ...) ...))))))
  
 (define-syntax ifu
   (syntax-rules ()
-    ((_) (mzero))
-    ((_ (e g ...) b ...)
+    ((_ n) (mzero))
+    ((_ n (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
-         (() (ifu b ...))
+         (() (ifu n b ...))
          ((f) (inc (loop (f))))
-         ((a) (bind* a-inf g ...))
-         ((a f) (bind* (unit a) g ...)))))))
+         ((a) (bind* n a-inf g ...))
+         ((a f) (bind* n (unit n a) g ...)))))))
 
 (define-syntax project
   (syntax-rules ()
     ((_ (x ...) g g* ...)
-     (lambdag@ (s)
-       (let ((x (walk* x s)) ...)
-         ((fresh () g g* ...) s))))))
+     (lambdag@ (n c : S F)
+       (let ((x (walk* x S)) ...)
+         ((fresh () g g* ...) n c))))))
 
 (define succeed (== #f #f))
 
@@ -318,33 +315,33 @@
           (let ((argv (list args ...))
                 (alt_name (string-append "co_" 
                           (symbol->string `name))))
-            (lambdag@ (c : S N F)
+            (lambdag@ (n c : S F)
               ; Inspect calling stack.
               ;(display S)
               (let ((key (map (lambda (arg)
                                 (walk arg S)) argv) ))
                 (let ((record (element-of-set? (list (string->symbol alt_name) key) F)))
                   (if (and record #t) 
-                    (let ((diff (- N (get-value record))))
+                    (let ((diff (- n (get-value record))))
                       (cond 
                         ; Positive loop (minimal model semantics)
                         ((= 0 diff)
-                          (if (even? N)
+                          (if (even? n)
                               (mzero)
-                              (unit c)))
+                              (unit n c)))
                         ; Negative loop (Odd co-inductive failure)
                         ((odd? diff) (mzero))
                         ; Negative loop (Even co-inductive success)
-                        (else (unit c)))
+                        (else (unit n c)))
                     )
                     ; Expand calling stack.
-                    ((if (even? N)
+                    ((if (even? n)
                       (begin (display `name ) (fresh () exp ...))
                       (begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
-                     ) (list S N (adjoin-set 
+                     ) n (list S (adjoin-set 
                                     (make-record
                                       (list (string->symbol alt_name) key)
-                                      N) F)))
+                                      n) F)))
                   )
                 )
               )
@@ -357,9 +354,9 @@
     ((_ (name args ...) exp ...)
       (begin
         (define name (lambda (args ...)
-          (lambdag@ (c : S N F)
+          (lambdag@ (n c : S F)
             ((fresh () exp ...)
-                    (list S N F))
+                    n (list S F))
           )
         ))
       ))))
@@ -367,11 +364,11 @@
 (define-syntax no
   (syntax-rules ()
     ((no (name args ...))
-      (lambdag@ (c : S N F)
-        (let ((newN (+ 1 N)))
+      (lambdag@ (n c : S F)
+        (let ((newN (+ 1 n)))
           (let ((newC (list S newN F)))
             (display newN)
-            ((name args ...) newC)
+            ((name args ...) newN c)
           )
         )
       )
