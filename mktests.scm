@@ -3800,8 +3800,8 @@ w)
 
 
 (test-check "testc22.tex-24" 
-(let ((s `((,y . (,z ,w c ,w)) (,x . ,y) (,z . a))))
-  (reify x s))
+(let ((s `(((,y . (,z ,w c ,w)) (,x . ,y) (,z . a)) ())))
+  ((reify x) s))
 
 `(a _.0 c _.0))
 (define e (make-engine (lambda ()   
