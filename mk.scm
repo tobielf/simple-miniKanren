@@ -299,17 +299,23 @@
 (define (get-value record)
   (cdr record))
 
+(define (set-value record value)
+  (set-cdr! record value))
+
 ; Unavoidable OLON in the program.
+(define tracking `())
 
 (define-syntax def-asp-rule
   (syntax-rules ()
     ((_ (name args ...) exp ...)
       (begin
         ; [ToDo] Add rule to tracking set.
+        (set! tracking (adjoin-set (make-record `name 0) tracking))
         ;(display `name)
         ; [ToDo] Define a transformed rule. [def-asp-complement-rule]
         (define name (lambda (args ...)
           ; [ToDo] Mark rule has been executed.
+          (set-value (element-of-set? `name tracking) 1)
           ;(display `name)
           ; Coinduction and tabling.
           (let ((argv (list args ...))
@@ -366,11 +372,9 @@
   (syntax-rules ()
     ((no (name args ...))
       (lambdag@ (n f c : S F)
-        (let ((newN (+ 1 n)))
-          (let ((newC (list S newN F)))
-            (display newN)
-            ((name args ...) newN f c)
-          )
+        (let ((newN (+ 1 n))) 
+          (display newN)
+          ((name args ...) newN f c)
         )
       )
     )))
