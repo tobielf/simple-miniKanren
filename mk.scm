@@ -302,6 +302,15 @@
 (define (set-value record value)
   (set-cdr! record value))
 
+; Record the procedure we produced the result.
+; [ToDo] Propositional only, add predicate support.
+(define update-F
+  (lambda (name)
+    (lambdag@(n f c : S F)
+      (set! F (adjoin-set (make-record (symbol->string name) n) F))
+      (list S F)
+    )))
+
 ; Unavoidable OLON in the program.
 (define tracking `())
 
@@ -324,32 +333,40 @@
             (lambdag@ (n f c : S F)
               ; Inspect calling stack.
               ;(display S)
-              (let ((key (map (lambda (arg)
-                                (walk arg S)) argv) ))
-                (cout argv nl S nl key nl nl)
-                (let ((record (element-of-set? (list (string->symbol alt_name) key) f)))
-                  (if (and record #t) 
-                    (let ((diff (- n (get-value record))))
-                      (cond 
-                        ; Positive loop (minimal model semantics)
-                        ((= 0 diff)
-                          (if (even? n)
-                              (mzero)
-                              (unit n f c)))
-                        ; Negative loop (Odd co-inductive failure)
-                        ((odd? diff) (mzero))
-                        ; Negative loop (Even co-inductive success)
-                        (else (unit n f c)))
+              (let ((result (element-of-set? (symbol->string `name) F)))
+                (if (and result #t)
+                    (cond ((and (even? (get-value result)) (even? n)) (unit n f c))
+                          ((and (even? (get-value result)) (odd? n)) (mzero))
+                          ((and (odd? (get-value result)) (even? n)) (mzero))
+                          ((and (odd? (get-value result)) (odd? n)) (unit n f c)))
+                    (let ((key (map (lambda (arg)
+                                    (walk arg S)) argv) ))
+                    (cout argv nl S nl key nl nl)
+                    (let ((record (element-of-set? (list (string->symbol alt_name) key) f)))
+                      (if (and record #t) 
+                        (let ((diff (- n (get-value record))))
+                          (cond 
+                            ; Positive loop (minimal model semantics)
+                            ((= 0 diff)
+                              (if (even? n)
+                                  (mzero)
+                                  (unit n f c)))
+                            ; Negative loop (Odd co-inductive failure)
+                            ((odd? diff) (mzero))
+                            ; Negative loop (Even co-inductive success)
+                            (else (unit n f c)))
+                        )
+                        ; Expand calling stack.
+                        ((if (even? n)
+                          (begin (display `name ) (fresh () exp ... (update-F `name)))
+                          (begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
+                         ) n (adjoin-set 
+                                        (make-record
+                                          (list (string->symbol alt_name) key)
+                                          n) f) c)
+                      )
                     )
-                    ; Expand calling stack.
-                    ((if (even? n)
-                      (begin (display `name ) (fresh () exp ...))
-                      (begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
-                     ) n (adjoin-set 
-                                    (make-record
-                                      (list (string->symbol alt_name) key)
-                                      n) f) c)
-                  )
+                    )
                 )
               )
             ))
