@@ -307,8 +307,7 @@
 (define update-F
   (lambda (name)
     (lambdag@(n f c : S F)
-      (set! F (adjoin-set (make-record (symbol->string name) n) F))
-      (list S F)
+      (list S (adjoin-set (make-record (symbol->string name) n) F))
     )))
 
 ; Unavoidable OLON in the program.
@@ -354,7 +353,7 @@
                             ; Negative loop (Odd co-inductive failure)
                             ((odd? diff) (mzero))
                             ; Negative loop (Even co-inductive success)
-                            (else (unit n f c)))
+                            (else (choice c (mzero)) ))
                         )
                         ; Expand calling stack.
                         ((if (even? n)
