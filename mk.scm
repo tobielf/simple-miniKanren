@@ -4,15 +4,16 @@
 (define-syntax lambdag@
   (syntax-rules (:)
     ((_ (n f c) e ...) (lambda (n f c) e ...))
-    ((_ (n f c : S F) e ...)
+    ((_ (n f c : S F G) e ...)
      (lambda (n f c)
        (let ((S (c->S c))
-             (F (c->F c)))
+             (F (c->F c))
+             (G (c->G c)))
          e ...)))))
 
 (define-syntax lambdaf@
   (syntax-rules ()
-    ((_ () e) (lambda () e))))
+    ((_ () e ...) (lambda () e ...))))
 
 (define-syntax run*
   (syntax-rules ()
@@ -30,9 +31,11 @@
 
 (define c->F (lambda (c) (cadr c)))
 
+(define c->G (lambda (c) (caddr c)))
+
 (define empty-s '())
 
-(define empty-c '(() ()))
+(define empty-c '(() () ()))
 
 (define walk
   (lambda (u S)
@@ -140,16 +143,43 @@
 
 (define empty-f (lambdaf@ () (mzero)))
 
+(define (find-untouched-rule record)
+  (let ((value (get-value record)))
+    (not (= value runid)))
+)
+
+(define (find-untouched-rules tracking-set)
+  (cond ((null? tracking-set) #f)
+        ((find-untouched-rule (car tracking-set)) (get-key (car tracking-set)))
+        (else (find-untouched-rules (cdr tracking-set)))))
+
+(define last-step
+  (lambda (x)
+    (lambdag@ (dummy frame final-c : S F G)
+      (let ((g (find-untouched-rules G)))
+        (if (and g #t)
+            (inc 
+             (mplus* 
+               (bind* 0 '() (((eval g)) 0 '() final-c) (last-step x))
+               (bind* 1 '() (((eval g)) 1 '() final-c) (last-step x))
+             ))
+            (let ((z ((reify x) final-c)))
+                  (choice z empty-f))))
+    )
+  )
+)
+
 (define-syntax run
   (syntax-rules ()
     ((_ n (x) g0 g ...)
      (take n
        (lambdaf@ ()
+         (set! runid (+ runid 1))
          ((fresh (x) g0 g ... 
-            (lambdag@ (dummy frame final-c)
-              (let ((z ((reify x) final-c)))
-                (choice z empty-f))))
-          0 '() empty-c))))))
+            (last-step x))
+          0 '() `(() () ,(map (lambda (record) (make-record (get-key record) (get-value
+ record))) tracking)
+                    ) ))))))
  
 (define take
   (lambda (n f)
@@ -165,10 +195,10 @@
 
 (define ==
   (lambda (u v)
-    (lambdag@ (n f c : S F)
+    (lambdag@ (n f c : S F G)
       (if (even? n)
         (cond
-          ((unify u v S) => (post-unify-== c S F))
+          ((unify u v S) => (post-unify-== c S F G))
           (else (mzero)))
         (cond
           ((unify u v S) => (lambda (s) (mzero)))
@@ -177,9 +207,9 @@
     )))
 
 (define post-unify-==
-  (lambda (c S F) 
+  (lambda (c S F G) 
     (lambda (S+) 
-      (unit 0 '() (list S+ F)))))
+      (unit 0 '() (list S+ F G)))))
  
 (define-syntax fresh
   (syntax-rules ()
@@ -266,7 +296,7 @@
 (define-syntax project
   (syntax-rules ()
     ((_ (x ...) g g* ...)
-     (lambdag@ (n fr c : S F)
+     (lambdag@ (n fr c : S F G)
        (let ((x (walk* x S)) ...)
          ((fresh () g g* ...) n fr c))))))
 
@@ -306,30 +336,30 @@
 ; [ToDo] Propositional only, add predicate support.
 (define update-F
   (lambda (name)
-    (lambdag@(n f c : S F)
-      (list S (adjoin-set (make-record (symbol->string name) n) F))
+    (lambdag@(n f c : S F G)
+      (list S (adjoin-set (make-record (symbol->string name) n) F) G)
     )))
 
 ; Unavoidable OLON in the program.
 (define tracking `())
 
+(define runid 0)
+
 (define-syntax def-asp-rule
   (syntax-rules ()
     ((_ (name args ...) exp ...)
       (begin
-        ; [ToDo] Add rule to tracking set.
+        ; Add rule to tracking set.
         (set! tracking (adjoin-set (make-record `name 0) tracking))
-        ;(display `name)
         ; [ToDo] Define a transformed rule. [def-asp-complement-rule]
         (define name (lambda (args ...)
-          ; [ToDo] Mark rule has been executed.
-          (set-value (element-of-set? `name tracking) 1)
-          ;(display `name)
           ; Coinduction and tabling.
           (let ((argv (list args ...))
                 (alt_name (string-append "co_" 
                           (symbol->string `name))))
-            (lambdag@ (n f c : S F)
+            (lambdag@ (n f c : S F G)
+              ; Mark rule has been executed. nl)
+              (set-value (element-of-set? `name G) runid)
               ; Inspect calling stack.
               ;(display S)
               (let ((result (element-of-set? (symbol->string `name) F)))
@@ -340,8 +370,7 @@
                           ((and (odd? (get-value result)) (odd? n)) (unit n f c)))
                     (let ((key (map (lambda (arg)
                                     (walk arg S)) argv) ))
-                    (cout argv nl S nl key nl nl)
-                    (let ((record (element-of-set? (list (string->symbol alt_name) key) f)))
+                    (let ((record (element-of-set? (list `name key) f)))
                       (if (and record #t) 
                         (let ((diff (- n (get-value record))))
                           (cond 
@@ -353,15 +382,15 @@
                             ; Negative loop (Odd co-inductive failure)
                             ((odd? diff) (mzero))
                             ; Negative loop (Even co-inductive success)
-                            (else (choice c (mzero)) ))
+                            (else (choice c mzero)))
                         )
                         ; Expand calling stack.
                         ((if (even? n)
-                          (begin (display `name ) (fresh () exp ... (update-F `name)))
+                          (begin (display `name) (fresh () exp ... (update-F `name)))
                           (begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
                          ) n (adjoin-set 
                                         (make-record
-                                          (list (string->symbol alt_name) key)
+                                          (list `name key)
                                           n) f) c)
                       )
                     )
@@ -377,9 +406,9 @@
     ((_ (name args ...) exp ...)
       (begin
         (define name (lambda (args ...)
-          (lambdag@ (n f c : S F)
+          (lambdag@ (n f c)
             ((fresh () exp ...)
-                    n f (list S F))
+                    n f c)
           )
         ))
       ))))
@@ -387,8 +416,8 @@
 (define-syntax no
   (syntax-rules ()
     ((no (name args ...))
-      (lambdag@ (n f c : S F)
-        (let ((newN (+ 1 n))) 
+      (lambdag@ (n f c)
+        (let ((newN (+ 1 n)))
           (display newN)
           ((name args ...) newN f c)
         )
