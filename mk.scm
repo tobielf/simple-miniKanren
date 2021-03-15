@@ -240,6 +240,18 @@
          (mplus* 
            (bind* n f (g0 n f s) g ...)
            (bind* n f (g1 n f s) g^ ...) ...))))))
+
+(define-syntax conde-t
+  (syntax-rules ()
+    ((_ (g0 g ...) (g1 g^ ...) ...)
+     (fresh ()
+      (conde [g0] [g] ...)
+      (conde [g1] [g^] ...) ...))))
+
+(define-syntax trans-conde
+  (syntax-rules (conde)
+    ((_ (conde (g0 g ...) (g1 g^ ...) ...)) (conde-t (g0 g ...) (g1 g^ ...) ...))
+  ))
  
 (define-syntax mplus*
   (syntax-rules ()
@@ -351,7 +363,7 @@
       (begin
         ; Add rule to tracking set.
         (set! tracking (adjoin-set (make-record `name 0) tracking))
-        ; [ToDo] Define a transformed rule. [def-asp-complement-rule]
+
         (define name (lambda (args ...)
           ; Coinduction and tabling.
           (let ((argv (list args ...))
@@ -387,7 +399,9 @@
                         ; Expand calling stack.
                         ((if (even? n)
                           (begin (display `name) (fresh () exp ... (update-F `name)))
-                          (begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
+                          ;(begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
+                          ; Define a transformed rule. [def-asp-complement-rule]
+                          (begin (display alt_name) (fresh () (trans-conde exp ...) (update-F `name)))
                          ) n (adjoin-set 
                                         (make-record
                                           (list `name key)
@@ -400,18 +414,6 @@
             ))
           ))
        ))))
-
-(define-syntax def-asp-complement-rule
-  (syntax-rules ()
-    ((_ (name args ...) exp ...)
-      (begin
-        (define name (lambda (args ...)
-          (lambdag@ (n f c)
-            ((fresh () exp ...)
-                    n f c)
-          )
-        ))
-      ))))
 
 (define-syntax no
   (syntax-rules ()
