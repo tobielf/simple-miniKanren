@@ -349,7 +349,7 @@
 (define update-F
   (lambda (name)
     (lambdag@(n f c : S F G)
-      (list S (adjoin-set (make-record (symbol->string name) n) F) G)
+      (list S (adjoin-set (make-record name n) F) G)
     )))
 
 ; Unavoidable OLON in the program.
@@ -374,7 +374,7 @@
               (set-value (element-of-set? `name G) runid)
               ; Inspect calling stack.
               ;(display S)
-              (let ((result (element-of-set? (symbol->string `name) F)))
+              (let ((result (element-of-set? `name F)))
                 (if (and result #t)
                     (cond ((and (even? (get-value result)) (even? n)) (unit n f c))
                           ((and (even? (get-value result)) (odd? n)) (mzero))
