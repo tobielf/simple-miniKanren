@@ -347,9 +347,13 @@
 ; Record the procedure we produced the result.
 ; [ToDo] Propositional only, add predicate support.
 (define update-F
-  (lambda (name)
+  (lambda (name argv)
     (lambdag@(n f c : S F G)
-      (list S (adjoin-set (make-record name n) F) G)
+      (let ((key (map (lambda (arg)
+                              (walk arg S)) argv) ))
+        (cout "update-F: " key nl)
+        (list S (adjoin-set (make-record (list name key) n) F) G)
+      )
     )))
 
 ; Unavoidable OLON in the program.
@@ -374,14 +378,14 @@
               (set-value (element-of-set? `name G) runid)
               ; Inspect calling stack.
               ;(display S)
-              (let ((result (element-of-set? `name F)))
-                (if (and result #t)
+              (let ((key (map (lambda (arg)
+                              (walk arg S)) argv) ))
+                (let ((result (element-of-set? (list `name key) F)))
+                  (if (and result #t)
                     (cond ((and (even? (get-value result)) (even? n)) (unit n f c))
                           ((and (even? (get-value result)) (odd? n)) (mzero))
                           ((and (odd? (get-value result)) (even? n)) (mzero))
                           ((and (odd? (get-value result)) (odd? n)) (unit n f c)))
-                    (let ((key (map (lambda (arg)
-                                    (walk arg S)) argv) ))
                     (let ((record (element-of-set? (list `name key) f)))
                       (if (and record #t) 
                         (let ((diff (- n (get-value record))))
@@ -398,17 +402,17 @@
                         )
                         ; Expand calling stack.
                         ((if (even? n)
-                          (begin (display `name) (fresh () exp ... (update-F `name)))
+                          (begin (display `name) (fresh () exp ... (update-F `name argv)))
                           ;(begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
                           ; Define a transformed rule. [def-asp-complement-rule]
-                          (begin (display alt_name) (fresh () (trans-conde exp ...) (update-F `name)))
+                          (begin (display alt_name) (fresh () (trans-conde exp ...) (update-F `name argv)))
                          ) n (adjoin-set 
                                         (make-record
                                           (list `name key)
                                           n) f) c)
                       )
                     )
-                    )
+                  )
                 )
               )
             ))
