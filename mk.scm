@@ -252,6 +252,23 @@
   (syntax-rules (conde)
     ((_ (conde (g0 g ...) (g1 g^ ...) ...)) (conde-t (g0 g ...) (g1 g^ ...) ...))
   ))
+
+(define-syntax fresh-t
+  (syntax-rules ()
+    ((_ g0)
+     (no (g0)))
+    ((_ g0 g ...)
+     (fresh ()
+      (conde [(no (g0))] [(g0 (fresh-t (g ...)))])
+     ))
+  ))
+
+(define-syntax trans-fresh
+  (syntax-rules (fresh)
+    ((_ (fresh (x ...) g0 g ...)) (fresh (x ...) (fresh-t g0 g ...)))
+    ((_ (g0 g ...)) (g0 g ...))
+
+  ))
  
 (define-syntax mplus*
   (syntax-rules ()
