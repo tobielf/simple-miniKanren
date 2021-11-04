@@ -261,10 +261,10 @@
 (define-syntax fresh-t
   (syntax-rules ()
     ((_ g0)
-     (no g0))
+     g0)
     ((_ g0 g ...)
      (fresh ()
-      (conde [(no g0)] [g0 (fresh-t g ...)])
+      (conde [g0] [(fresh () (no g0) (fresh-t g ...))])
      ))
   ))
 
@@ -388,7 +388,8 @@
     ((_ (name args ...) exp ...)
       (begin
         ; Add rule to tracking set.
-        (set! tracking (adjoin-set (make-record `name 0) tracking))
+        (set! tracking (adjoin-set (make-record 
+            (make-record `name (length (list args ...))) 0) tracking))
 
         (define name (lambda (args ...)
           ; Coinduction and tabling.
@@ -397,7 +398,8 @@
                           (symbol->string `name))))
             (lambdag@ (n f c : S F G)
               ; Mark rule has been executed. nl)
-              (set-value (element-of-set? `name G) runid)
+              ;(cout `name " " (length argv) " G:" G nl)
+              (set-value (element-of-set? (make-record `name (length argv)) G) runid)
               ; Inspect calling stack.
               ;(display S)
               (let ((key (map (lambda (arg)
