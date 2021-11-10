@@ -250,8 +250,8 @@
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
      (fresh ()
-      (conde [(trans-fresh g0)] [(trans-fresh g)] ...)
-      (conde [(trans-fresh g1)] [(trans-fresh g^)] ...) ...))))
+      (trans-fresh g0 g ...)
+      (trans-fresh g1 g^ ...) ...))))
 
 (define-syntax trans-conde
   (syntax-rules (conde)
@@ -271,7 +271,7 @@
 (define-syntax trans-fresh
   (syntax-rules (fresh)
     ((_ (fresh (x ...) g0 g ...)) (fresh (x ...) (fresh-t g0 g ...)))
-    ((_ g0) g0)
+    ((_ g0 g ...) (fresh-t g0 g ...))
 
   ))
  
