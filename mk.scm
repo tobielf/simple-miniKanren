@@ -153,6 +153,11 @@
         ((find-untouched-rule (car tracking-set)) (get-key (car tracking-set)))
         (else (find-untouched-rules (cdr tracking-set)))))
 
+(define (construct-var-list n)
+  (if (= n 0)
+      `()
+      (cons (var (string->symbol (string-append "temp_" (number->string n)))) (construct-var-list (- n 1)))))
+
 (define last-step
   (lambda (x)
     (lambdag@ (dummy frame final-c : S F G)
@@ -160,8 +165,8 @@
         (if (and g #t)
             (inc 
              (mplus* 
-               (bind* 0 '() (((eval g)) 0 '() final-c) (last-step x))
-               (bind* 1 '() (((eval g)) 1 '() final-c) (last-step x))
+               (bind* 0 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) 0 '() final-c) (last-step x))
+               (bind* 1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) 1 '() final-c) (last-step x))
              ))
             (let ((z ((reify x) final-c)))
                   (choice z empty-f))))
@@ -245,12 +250,29 @@
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
      (fresh ()
-      (conde [g0] [g] ...)
-      (conde [g1] [g^] ...) ...))))
+      (trans-fresh g0 g ...)
+      (trans-fresh g1 g^ ...) ...))))
 
 (define-syntax trans-conde
   (syntax-rules (conde)
     ((_ (conde (g0 g ...) (g1 g^ ...) ...)) (conde-t (g0 g ...) (g1 g^ ...) ...))
+  ))
+
+(define-syntax fresh-t
+  (syntax-rules ()
+    ((_ g0)
+     g0)
+    ((_ g0 g ...)
+     (fresh ()
+      (conde [g0] [(fresh () (no g0) (fresh-t g ...))])
+     ))
+  ))
+
+(define-syntax trans-fresh
+  (syntax-rules (fresh)
+    ((_ (fresh (x ...) g0 g ...)) (fresh (x ...) (fresh-t g0 g ...)))
+    ((_ g0 g ...) (fresh-t g0 g ...))
+
   ))
  
 (define-syntax mplus*
@@ -366,7 +388,8 @@
     ((_ (name args ...) exp ...)
       (begin
         ; Add rule to tracking set.
-        (set! tracking (adjoin-set (make-record `name 0) tracking))
+        (set! tracking (adjoin-set (make-record 
+            (make-record `name (length (list args ...))) 0) tracking))
 
         (define name (lambda (args ...)
           ; Coinduction and tabling.
@@ -375,7 +398,8 @@
                           (symbol->string `name))))
             (lambdag@ (n f c : S F G)
               ; Mark rule has been executed. nl)
-              (set-value (element-of-set? `name G) runid)
+              ;(cout `name " " (length argv) " G:" G nl)
+              (set-value (element-of-set? (make-record `name (length argv)) G) runid)
               ; Inspect calling stack.
               ;(display S)
               (let ((key (map (lambda (arg)
