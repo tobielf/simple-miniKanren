@@ -159,14 +159,13 @@
       (cons (var (string->symbol (string-append "temp_" (number->string n)))) (construct-var-list (- n 1)))))
 
 (define last-step
-  (lambda (x)
+  (lambda (tracking-set x)
     (lambdag@ (dummy frame final-c : S F G)
-      (let ((g (find-untouched-rules G)))
+      (let ((g (find-untouched-rules tracking-set)))
         (if (and g #t)
             (inc 
              (mplus* 
-               (bind* 0 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) 0 '() final-c) (last-step x))
-               (bind* 1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) 1 '() final-c) (last-step x))
+               (bind* -1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) -1 '() final-c) (last-step (cdr tracking-set) x))
              ))
             (let ((z ((reify x) final-c)))
                   (choice z empty-f))))
@@ -181,11 +180,10 @@
        (lambdaf@ ()
          (set! runid (+ runid 1))
          ((fresh (x) g0 g ... 
-            (last-step x))
-          0 '() `(() () ,(map (lambda (record) (make-record (get-key record) (get-value
- record))) tracking)
-                    ) ))))))
- 
+            (last-step tracking x))
+          0 `() `(() () 0) 
+         ))))))
+
 (define take
   (lambda (n f)
     (if (and n (zero? n)) 
@@ -272,8 +270,36 @@
   (syntax-rules (fresh)
     ((_ (fresh (x ...) g0 g ...)) (fresh (x ...) (fresh-t g0 g ...)))
     ((_ g0 g ...) (fresh-t g0 g ...))
-
   ))
+
+(define-syntax check-negation
+  (syntax-rules ()
+    ((_ (g0 ...)) (let ((name (car `(g0 ...))))
+        (if (equal? name 'no)
+            #t
+            #f)))
+    ((_ (g0 ...) (g1 ...) ...) 
+      (let ((name (car `(g0 ...))))
+        (if (equal? name 'no)
+            #t
+            (check-negation (g1 ...) ...))))
+  )
+)
+
+(define-syntax filter-negation
+  (syntax-rules ()
+    ((_ g0 g1 ...) (lambdag@ (n f c)
+                      (if (check-negation g0 g1 ...)
+                        ((trans-fresh g0 g1 ...) n f c)
+                        (fail n f c)))))
+)
+
+(define-syntax global-checking
+  (syntax-rules ()
+    ((_ (conde (g0 g ...) (g1 g^ ...) ...))
+      (fresh () (filter-negation g0 g ...) (filter-negation g1 g^ ...) ...)
+    ))
+)
  
 (define-syntax mplus*
   (syntax-rules ()
@@ -373,7 +399,7 @@
     (lambdag@(n f c : S F G)
       (let ((key (map (lambda (arg)
                               (walk arg S)) argv) ))
-        (cout "update-F: " key nl)
+        (cout "update-F: " name key nl)
         (list S (adjoin-set (make-record (list name key) n) F) G)
       )
     )))
@@ -397,9 +423,6 @@
                 (alt_name (string-append "co_" 
                           (symbol->string `name))))
             (lambdag@ (n f c : S F G)
-              ; Mark rule has been executed. nl)
-              ;(cout `name " " (length argv) " G:" G nl)
-              (set-value (element-of-set? (make-record `name (length argv)) G) runid)
               ; Inspect calling stack.
               ;(display S)
               (let ((key (map (lambda (arg)
@@ -425,12 +448,19 @@
                             (else (choice c mzero)))
                         )
                         ; Expand calling stack.
-                        ((if (even? n)
-                          (begin (display `name) (fresh () exp ... (update-F `name argv)))
-                          ;(begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
-                          ; Define a transformed rule. [def-asp-complement-rule]
-                          (begin (display alt_name) (fresh () (trans-conde exp ...) (update-F `name argv)))
-                         ) n (adjoin-set 
+                        ((cond ((< n 0) (begin (cout 'nmr nl) (global-checking exp ...)))
+                              ((even? n) (begin (cout `name nl) (fresh () exp ... (update-F `name argv))))
+                              (else (begin (cout alt_name nl) (fresh () (trans-conde exp ...) (update-F `name argv)))
+                              ))
+                        ;(if (even? n)
+                        ;  (begin (display `name) (fresh () exp ... (update-F `name argv)))
+                        ;  ;(begin (display alt_name) ((eval (string->symbol alt_name)) args ...))
+                        ;  ; Define a transformed rule. [def-asp-complement-rule]
+                        ;  (begin (display alt_name) (fresh () (trans-conde exp ...) (update-F `name argv)))
+                        ; ) 
+                         (if (< n 0)
+                          1
+                          n) (adjoin-set 
                                         (make-record
                                           (list `name key)
                                           n) f) c)
