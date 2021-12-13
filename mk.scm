@@ -212,7 +212,7 @@
 (define post-unify-==
   (lambda (c S F G) 
     (lambda (S+) 
-      (unit 0 '() (list S+ F G)))))
+      (unit 0 '() (list S+ F S)))))
  
 (define-syntax fresh
   (syntax-rules ()
@@ -256,20 +256,74 @@
     ((_ (conde (g0 g ...) (g1 g^ ...) ...)) (conde-t (g0 g ...) (g1 g^ ...) ...))
   ))
 
+(define (find-bound-vars argv S)
+  (if (null? argv)
+      '()
+      (let ((key (walk (car argv) S)))
+        (if (not (var? key))
+            (cons (car argv) (find-bound-vars (cdr argv) S))
+            (find-bound-vars (cdr argv) S)))))
+
+(define (remove-var var S)
+  (if (null? S)
+      '()
+      (if (equal? var (car (car S)))
+          (remove-var var (cdr S))
+          (cons (car S) (remove-var var (cdr S))))))
+
 (define-syntax fresh-t
   (syntax-rules ()
-    ((_ g0)
+    ((_ (x ...) g0)
      g0)
-    ((_ g0 g ...)
+    ((_ (x ...) g0 g ...)
      (fresh ()
-      (conde [g0] [(fresh () (no g0) (fresh-t g ...))])
+      (conde [g0] [(fresh () 
+                      (no g0)
+                      (lambdag@ (n f c : S F G)
+                        (define helper
+                          (lambda (var values)
+                            (lambdag@(nn ff cc : SS FF GG)
+                              (if (null? values)
+                                  (list G FF GG)
+                                  (inc 
+                                   (mplus* 
+                                     (bind* n f ((fresh-t (x ...) g ...) n f (list (ext-s var (car values) G) FF G)) (helper var (cdr values)))
+                                   ))
+                              )
+                              
+                            )
+                          )
+                        )
+                        (let ((argv (list x ...)))
+                          (let ((bounded-vars (find-bound-vars argv S)))
+                            (if (null? bounded-vars)
+                                ((fresh-t (x ...) g ...) n f c)
+                                (begin
+                                  ; [ToDo] Add multiple variables support.
+                                  (cout (car bounded-vars) nl)
+                                  (cout "remove var:" (car bounded-vars) "from S:" S nl)
+                                  (cout "removed S:" (remove-var (car bounded-vars) S) nl)
+                                  (cout "Old S:" G nl)
+                                  (let ((domain-of-var (take #f (lambdaf@ () ((fresh () (no g0) (last-step '() (car bounded-vars))) n f (list G F G))))))
+                                    (cout domain-of-var nl)
+                                    ((helper (car bounded-vars) domain-of-var) n f c)
+                                    ;((fresh-t (x ...) g ...) n f (list (ext-s (car bounded-vars) (car domain-of-var) G) F G))
+                                  )
+                                )
+                            )
+                          )
+                        )
+                      )
+                    )]) 
+                      ;(fresh-t (x ...) g ...))])
      ))
   ))
 
 (define-syntax trans-fresh
   (syntax-rules (fresh)
-    ((_ (fresh (x ...) g0 g ...)) (fresh (x ...) (fresh-t g0 g ...)))
-    ((_ g0 g ...) (fresh-t g0 g ...))
+    ((_ (fresh (x ...) g0 g ...)) (fresh (x ...) 
+                                      (fresh-t (x ...) g0 g ...)))
+    ((_ g0 g ...) (fresh-t () g0 g ...))
   ))
 
 (define-syntax check-negation
