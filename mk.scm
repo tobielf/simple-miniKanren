@@ -143,15 +143,10 @@
 
 (define empty-f (lambdaf@ () (mzero)))
 
-(define (find-untouched-rule record)
-  (let ((value (get-value record)))
-    (not (= value runid)))
-)
-
-(define (find-untouched-rules tracking-set)
-  (cond ((null? tracking-set) #f)
-        ((find-untouched-rule (car tracking-set)) (get-key (car tracking-set)))
-        (else (find-untouched-rules (cdr tracking-set)))))
+(define (fetch-predicate tracking-set)
+  (if (null? tracking-set)
+      #f
+      (get-key (car tracking-set))))
 
 (define (construct-var-list n)
   (if (= n 0)
@@ -161,7 +156,7 @@
 (define last-step
   (lambda (tracking-set x)
     (lambdag@ (dummy frame final-c : S F G)
-      (let ((g (find-untouched-rules tracking-set)))
+      (let ((g (fetch-predicate tracking-set)))
         (if (and g #t)
             (inc 
              (mplus* 
@@ -178,7 +173,6 @@
     ((_ n (x) g0 g ...)
      (take n
        (lambdaf@ ()
-         (set! runid (+ runid 1))
          ((fresh (x) g0 g ... 
             (last-step tracking x))
           0 `() `(() () 0) 
@@ -460,8 +454,6 @@
 
 ; Unavoidable OLON in the program.
 (define tracking `())
-
-(define runid 0)
 
 (define-syntax def-asp-rule
   (syntax-rules ()
