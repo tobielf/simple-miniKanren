@@ -350,8 +350,8 @@
 
 (define-syntax global-checking
   (syntax-rules ()
-    ((_ (conde (g0 g ...) (g1 g^ ...) ...))
-      (fresh () (filter-negation g0 g ...) (filter-negation g1 g^ ...) ...)
+    ((_ (conde (g0 g ...) (g1 g^ ...) ...) (name args ...) )
+      (fresh () (filter-negation g0 g ... (name args ...) ) (filter-negation g1 g^ ... (name args ...)) ...)
     ))
 )
  
@@ -500,7 +500,7 @@
                             (else (choice c mzero)))
                         )
                         ; Expand calling stack.
-                        ((cond ((< n 0) (begin (cout 'nmr nl) (global-checking exp ...)))
+                        ((cond ((< n 0) (begin (cout 'nmr nl) (global-checking exp ... (name args ...) )))
                               ((even? n) (begin (cout `name nl) (fresh () exp ... (update-F `name argv))))
                               (else (begin (cout alt_name nl) (fresh () (trans-conde exp ...) (update-F `name argv)))
                               ))
