@@ -164,10 +164,9 @@
     (lambdag@ (dummy frame final-c : S F G)
       (let ((g (fetch-predicate tracking-set)))
         (if (and g #t)
-            (inc 
-             (mplus* 
-               (bind* -1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) -1 '() final-c) (last-step (cdr tracking-set) x))
-             ))
+            (inc
+              (bind* -1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) -1 '() final-c) (last-step (cdr tracking-set) x))
+            )
             (let ((z ((reify x) final-c)))
                   (choice z empty-f))))
     )
@@ -286,9 +285,8 @@
                               (if (null? values)
                                   (list G FF GG)
                                   (inc 
-                                   (mplus* 
-                                     (bind* n f ((fresh-t (x ...) g ...) n f (list (ext-s var (car values) G) FF G)) (helper var (cdr values)))
-                                   ))
+                                    (bind* n f ((fresh-t (x ...) g ...) n f (list (ext-s var (car values) G) FF G)) (helper var (cdr values)))
+                                  )
                               )
                               
                             )
