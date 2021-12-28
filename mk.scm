@@ -261,7 +261,7 @@
                               (if (null? values)
                                   (list G FF GG)
                                   (inc 
-                                    (bind* n f ((fresh-t (x ...) g ...) n f (list (ext-s var (car values) G) FF G)) (helper var (cdr values)))
+                                    (bind* n f ((fresh-t (x ...) g ...) n f (list (ext-s var (car (car values)) G) FF G)) (helper var (cdr values)))
                                   )
                               )
                               
@@ -278,8 +278,7 @@
                                   (cout "remove var:" (car bounded-vars) "from S:" S nl)
                                   (cout "removed S:" (remove-var (car bounded-vars) S) nl)
                                   (cout "Old S:" G nl)
-                                  (let ((domain-of-var (take #f (lambdaf@ () ((fresh () (no g0) (last-step '() (car bounded-vars))) n f (list G F G))))))
-                                    (cout domain-of-var nl)
+                                  (let ((domain-of-var (take #f (lambdaf@ () ((fresh (tmp) (no g0) (no (== tmp bounded-vars)) (last-step '() tmp)) n f (list G F G))))))
                                     ((helper (car bounded-vars) domain-of-var) n f c)
                                     ;((fresh-t (x ...) g ...) n f (list (ext-s (car bounded-vars) (car domain-of-var) G) F G))
                                   )
