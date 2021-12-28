@@ -252,45 +252,40 @@
      g0)
     ((_ (x ...) g0 g ...)
      (fresh ()
-      (conde [g0] [(fresh () 
-                      (no g0)
-                      (lambdag@ (n f c : S F G)
-                        (define helper
-                          (lambda (var values)
-                            (lambdag@(nn ff cc : SS FF GG)
-                              (if (null? values)
-                                  (list G FF GG)
-                                  (inc 
-                                    (bind* n f ((fresh-t (x ...) g ...) n f (list (ext-s var (car (car values)) G) FF G)) (helper var (cdr values)))
-                                  )
-                              )
-                              
-                            )
-                          )
-                        )
-                        (let ((argv (list x ...)))
-                          (let ((bounded-vars (find-bound-vars argv S)))
-                            (if (null? bounded-vars)
-                                ((fresh-t (x ...) g ...) n f c)
-                                (begin
-                                  ; [ToDo] Add multiple variables support.
-                                  (cout (car bounded-vars) nl)
-                                  (cout "remove var:" (car bounded-vars) "from S:" S nl)
-                                  (cout "removed S:" (remove-var (car bounded-vars) S) nl)
-                                  (cout "Old S:" G nl)
-                                  (let ((domain-of-var (take #f (lambdaf@ () ((fresh (tmp) (no g0) (no (== tmp bounded-vars)) (last-step '() tmp)) n f (list G F G))))))
-                                    ((helper (car bounded-vars) domain-of-var) n f c)
-                                    ;((fresh-t (x ...) g ...) n f (list (ext-s (car bounded-vars) (car domain-of-var) G) F G))
-                                  )
-                                )
-                            )
-                          )
-                        )
-                      )
-                    )]) 
-                      ;(fresh-t (x ...) g ...))])
-     ))
-  ))
+      (conde 
+        [g0] 
+        [(fresh () 
+          (no g0)
+          ;(fresh-t (x ...) g ...))])
+          (lambdag@ (n f c : S F G)
+            (define helper
+              (lambda (var values)
+                (lambdag@(nn ff cc : SS FF GG)
+                  (if (null? values)
+                    (list G FF GG)
+                      (inc 
+                        (bind* n f 
+                            ((fresh-t (x ...) g ...) n f 
+                              (list (ext-s var (car (car values)) G) FF G))
+                            (helper var (cdr values)))
+            )))))
+            (let ((argv (list x ...)))
+              (let ((bounded-vars (find-bound-vars argv S)))
+                (if (null? bounded-vars)
+                  ((fresh-t (x ...) g ...) n f c)
+                  (begin
+                    ; [ToDo] Add multiple variables support.
+                    (cout (car bounded-vars) nl)
+                    (cout "remove var:" (car bounded-vars) "from S:" S nl)
+                    (cout "removed S:" (remove-var (car bounded-vars) S) nl)
+                    (cout "Old S:" G nl)
+                    (let ((domain-of-var (take #f (lambdaf@ () ((fresh (tmp) (no g0) (no (== tmp bounded-vars)) (last-step '() tmp)) n f (list G F G))))))
+                      ((helper (car bounded-vars) domain-of-var) n f c)
+                      ;((fresh-t (x ...) g ...) n f (list (ext-s (car bounded-vars) (car domain-of-var) G) F G))
+                    ))))))
+        )])
+      ))
+))
 
 (define-syntax trans-fresh
   (syntax-rules (fresh)
