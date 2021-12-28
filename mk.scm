@@ -149,30 +149,6 @@
 
 (define empty-f (lambdaf@ () (mzero)))
 
-(define (fetch-predicate tracking-set)
-  (if (null? tracking-set)
-      #f
-      (get-key (car tracking-set))))
-
-(define (construct-var-list n)
-  (if (= n 0)
-      `()
-      (cons (var (string->symbol (string-append "temp_" (number->string n)))) (construct-var-list (- n 1)))))
-
-(define last-step
-  (lambda (tracking-set x)
-    (lambdag@ (dummy frame final-c : S F G)
-      (let ((g (fetch-predicate tracking-set)))
-        (if (and g #t)
-            (inc
-              (bind* -1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) -1 '() final-c) (last-step (cdr tracking-set) x))
-            )
-            (let ((z ((reify x) final-c)))
-                  (choice z empty-f))))
-    )
-  )
-)
-
 (define-syntax run
   (syntax-rules ()
     ((_ n (x) g0 g ...)
@@ -351,6 +327,30 @@
     ((_ (conde (g0 g ...) (g1 g^ ...) ...) (name args ...) )
       (fresh () (filter-negation g0 g ... (name args ...) ) (filter-negation g1 g^ ... (name args ...)) ...)
     ))
+)
+
+(define (fetch-predicate tracking-set)
+  (if (null? tracking-set)
+      #f
+      (get-key (car tracking-set))))
+
+(define (construct-var-list n)
+  (if (= n 0)
+      `()
+      (cons (var (string->symbol (string-append "temp_" (number->string n)))) (construct-var-list (- n 1)))))
+
+(define last-step
+  (lambda (tracking-set x)
+    (lambdag@ (dummy frame final-c : S F G)
+      (let ((g (fetch-predicate tracking-set)))
+        (if (and g #t)
+            (inc
+              (bind* -1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) -1 '() final-c) (last-step (cdr tracking-set) x))
+            )
+            (let ((z ((reify x) final-c)))
+                  (choice z empty-f))))
+    )
+  )
 )
  
 (define-syntax mplus*
