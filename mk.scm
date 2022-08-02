@@ -372,8 +372,8 @@
   (take #f 
     (lambdaf@ () 
       ((fresh 
-        (tmp vars) 
-        ((eval goal) vars)
+        (tmp) 
+        (apply (eval goal) vars)
         (== tmp vars) 
         (last-step '() tmp)) 
         -2 `() `(() () 0))))
@@ -404,7 +404,7 @@
                     ;    cc)
                     ;  (helper g ( cdr values)))
                     (bind* -1 ff 
-                      ((apply (eval (get-key g)) (list (car values))) -1 ff 
+                      ((apply (eval (get-key g)) (car values)) -1 ff 
                         cc)
                       (helper g (cdr values)))
                  )
