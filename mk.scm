@@ -7,6 +7,8 @@
               (if (procedure? x) (x) (display x)))
             args))
 
+(load "grounding.scm")
+
 (define-syntax lambdag@
   (syntax-rules (:)
     ((_ (n f c) e ...) (lambda (n f c) e ...))
@@ -255,6 +257,17 @@
           (ext-s (car vars) (car values) S))
 ))
 
+(define (contain? var var-to-remove)
+  (cond ((null? var-to-remove) #f)
+        ((eq? var (car var-to-remove)) #t)
+        (else (contain? var (cdr var-to-remove)))))
+
+
+(define (remove-var-from-list var-list var-to-remove)
+  (cond ((null? var-list) `())
+        ((contain? (car var-list) var-to-remove) (remove-var-from-list (cdr var-list) var-to-remove))
+        (else (cons (car var-list) (remove-var-from-list (cdr var-list) var-to-remove)))))
+
 (define-syntax fresh-t
   (syntax-rules ()
     ((_ (x ...) g0)
@@ -269,24 +282,25 @@
           (lambdag@ (n f c : S F G)
             (define helper
               (lambda (vars values)
-                (lambdag@(nn ff cc : SS FF GG)
-                  (if (null? values)
-                    (list G FF GG)
-                      (inc 
-                        (bind* n f 
-                            ((fresh-t (x ...) g ...) n f 
-                              (list (ext-s-for-all-vars vars (car values) G) FF G))
-                            (helper vars (cdr values)))
-            )))))
+                (let ((var-list (remove-var-from-list (list x ...) vars)))
+                  (lambdag@(nn ff cc : SS FF GG)
+                    (if (null? values)
+                      (list G FF G)
+                        (inc 
+                          (bind* nn ff 
+                              ((fresh-t (var-list) g ...) nn ff 
+                                (list (ext-s-for-all-vars vars (car values) GG) FF GG))
+                              (helper vars (cdr values)))
+            ))))))
             (let ((argv (list x ...)))
               (let ((bounded-vars (find-bound-vars argv S)))
                 (if (null? bounded-vars)
                   ((fresh-t (x ...) g ...) n f c)
                   (begin
-                    (cout (car bounded-vars) nl)
-                    (cout "remove var:" (car bounded-vars) "from S:" S nl)
-                    (cout "removed S:" (remove-var (car bounded-vars) S) nl)
-                    (cout "Old S:" G nl)
+                    ;(cout bounded-vars nl)
+                    ;(cout "remove var:" (car bounded-vars) "from S:" S nl)
+                    ;(cout "removed S:" (remove-var (car bounded-vars) S) nl)
+                    ;(cout "Old S:" G nl)
                     (let ((domain-of-vars (take #f (lambdaf@ () ((fresh (tmp) (no g0) (no (== tmp bounded-vars)) (last-step '() tmp)) n f (list G F G))))))
                       ((helper bounded-vars domain-of-vars) n f c)
                       ;((fresh-t (x ...) g ...) n f (list (ext-s (car bounded-vars) (car domain-of-vars) G) F G))
@@ -302,8 +316,18 @@
     ((_ g0 g ...) (fresh-t () g0 g ...))
   ))
 
-(define-syntax check-negation
+(define-syntax trans-fresh-nmr
+  (syntax-rules (fresh)
+    ((_ (fresh (x ...) g0 g ...) original-goal) (begin ;(cout "attach" `original-goal " to " `(g0 g ...) nl)
+      (fresh (x ...) 
+                                      (fresh-t (x ...) g0 g ... (no original-goal)))))
+    ((_ g0 g ... original-goal) (fresh-t () g0 g ... (no original-goal)))
+  ))
+
+(define-syntax has-negation?
   (syntax-rules ()
+    ((_ (fresh (x ...) g0 g ...))
+        (has-negation? g0 g ...))
     ((_ (g0 ...)) (let ((name (car `(g0 ...))))
         (if (equal? name 'no)
             #t
@@ -312,22 +336,23 @@
       (let ((name (car `(g0 ...))))
         (if (equal? name 'no)
             #t
-            (check-negation (g1 ...) ...))))
+            (has-negation? (g1 ...) ...))))
   )
 )
 
 (define-syntax filter-negation
   (syntax-rules ()
-    ((_ g0 g1 ...) (lambdag@ (n f c)
-                      (if (check-negation g0 g1 ...)
-                        ((trans-fresh g0 g1 ...) n f c)
+    ((_ (g0 g1 ...) original-goal) (lambdag@ (n f c)
+                      (if (has-negation? g0 g1 ...)
+                        (begin ;(cout `(g0 g1 ...) "has negation" nl)
+                         ((trans-fresh-nmr g0 g1 ... original-goal) n f c))
                         (fail n f c)))))
 )
 
 (define-syntax global-checking
   (syntax-rules ()
     ((_ (conde (g0 g ...) (g1 g^ ...) ...) (name args ...) )
-      (fresh () (filter-negation g0 g ... (name args ...) ) (filter-negation g1 g^ ... (name args ...)) ...)
+      (fresh () (filter-negation (g0 g ...) (name args ...) ) (filter-negation (g1 g^ ...) (name args ...)) ...)
     ))
 )
 
@@ -341,25 +366,71 @@
       `()
       (cons (var (string->symbol (string-append "temp_" (number->string n)))) (construct-var-list (- n 1)))))
 
-(define last-step
-  (lambda (tracking-set x)
-    (lambdag@ (dummy frame final-c : S F G)
-      (let ((g (fetch-predicate tracking-set)))
-        (if (and g #t)
-            (inc
-              (bind* -1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) -1 '() final-c) (last-step (cdr tracking-set) x))
-            )
-            (let ((z ((reify x) final-c)))
-                  (choice z empty-f))))
-    )
-  )
+(define (ground-values goal vars)
+  ; [ToDo] filter out "_.0" from the domain.
+  ; If we get an empty set after filtering, we found an unsafe variable.
+  (take #f 
+    (lambdaf@ () 
+      ((fresh 
+        (tmp vars) 
+        ((eval goal) vars)
+        (== tmp vars) 
+        (last-step '() tmp)) 
+        -2 `() `(() () 0))))
 )
- 
+
 (define-syntax mplus*
   (syntax-rules ()
     ((_ e) e)
     ((_ e0 e ...) (mplus e0 
                     (lambdaf@ () (mplus* e ...))))))
+
+(define last-step
+  (lambda (tracking-set x)
+    (lambdag@ (dummy frame final-c : S F G)
+      (define helper
+        (lambda (g values)
+          (lambdag@(nn ff cc : SS FF GG)
+            (if (null? values)
+                (list S F G)
+                (inc
+                  (mplus*
+                    ;(bind* 0 ff 
+                    ;  ((apply (eval (get-key g)) (car values)) 0 ff 
+                    ;    cc)
+                    ;  (helper g (cdr values)))
+                    ;(bind* 1 ff 
+                    ;  ((apply (eval (get-key g)) (car values)) 1 ff 
+                    ;    cc)
+                    ;  (helper g ( cdr values)))
+                    (bind* -1 ff 
+                      ((apply (eval (get-key g)) (list (car values))) -1 ff 
+                        cc)
+                      (helper g (cdr values)))
+                 )
+            ))
+          )))
+      (let ((g (fetch-predicate tracking-set)))
+        (if (and g #t)
+            ; [ToDo] Handle the propositional case here.
+            ; If the arity is 0, we don't need to ground-values, we can run the
+            ; goal directly.
+            (let ((vals (ground-values (get-key g) (construct-var-list (get-value g)))))
+            (inc
+              ;(mplus*
+              ; (bind* -1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) -1 '() final-c) (last-step (cdr tracking-set) x))
+              ; (bind* -1 frame ((helper g vals) -1 frame final-c) (last-step (cdr tracking-set) x))
+              (bind* 0 frame ((helper g vals) 0 frame final-c) (last-step (cdr tracking-set) x))
+              ;(bind* 1 frame ((helper g vals) 1 frame final-c) (last-step (cdr tracking-set) x))
+              ;)
+            ))
+            (let ((z ((reify x) final-c)))
+                  (choice z empty-f))
+          )
+      )
+    )
+  )
+)
  
 (define mplus
   (lambda (a-inf f)
@@ -447,13 +518,13 @@
   (set-cdr! record value))
 
 ; Record the procedure we produced the result.
-; [ToDo] Propositional only, add predicate support.
+; Added predicate support.
 (define update-F
   (lambda (name argv)
     (lambdag@(n f c : S F G)
       (let ((key (map (lambda (arg)
                               (walk arg S)) argv) ))
-        (cout "update-F: " name key nl)
+        ; (cout "update-F: " name key nl)
         (list S (adjoin-set (make-record (list name key) n) F) G)
       )
     )))
@@ -475,12 +546,14 @@
                           (symbol->string `name))))
             (lambdag@ (n f c : S F G)
               ; Inspect calling stack.
-              ;(display S)
+              ;(cout S `name argv " n: " n nl)
+              ;(cout "frame: " f nl)
               (let ((key (map (lambda (arg)
-                              (walk arg S)) argv) ))
+                              (walk* arg S)) argv) ))
                 (let ((result (element-of-set? (list `name key) F)))
                   (if (and result #t)
-                    (cond ((< n 0) (unit n f c))
+                    (cond ((< n 0) (begin ;(cout "nmr_check:" `name key nl) 
+                                    (unit n f c)))
                           ((and (even? (get-value result)) (even? n)) (unit n f c))
                           ((and (even? (get-value result)) (odd? n)) (mzero))
                           ((and (odd? (get-value result)) (even? n)) (mzero))
@@ -488,6 +561,10 @@
                     (let ((record (element-of-set? (list `name key) f)))
                       (if (and record #t) 
                         (let ((diff (- n (get-value record))))
+                          ; (cout "subsitution:" S " " `name argv " n: " n nl)
+                          ; (cout "frame: " f nl)
+                          ; (cout "name: " `name " key: " key)
+                          ; (cout "diff: " diff " n: " n nl)
                           (cond 
                             ; Positive loop (minimal model semantics)
                             ((= 0 diff)
@@ -500,9 +577,10 @@
                             (else (choice c mzero)))
                         )
                         ; Expand calling stack.
-                        ((cond ((< n 0) (begin (cout 'nmr nl) (global-checking exp ... (name args ...) )))
-                              ((even? n) (begin (cout `name nl) (fresh () exp ... (update-F `name argv))))
-                              (else (begin (cout alt_name nl) (fresh () (trans-conde exp ...) (update-F `name argv)))
+                        ((cond ((= n -1) (begin (fresh () (global-checking exp ... (name args ...)) (update-F `name argv)) ))
+                              ((= n -2) (begin (fresh () (remove-negation exp ...) (update-F `name argv))))
+                              ((even? n) (begin (fresh () exp ... (update-F `name argv))))
+                              (else (begin (fresh () (trans-conde exp ...) (update-F `name argv)))
                               ))
                         ;(if (even? n)
                         ;  (begin (display `name) (fresh () exp ... (update-F `name argv)))
@@ -510,12 +588,17 @@
                         ;  ; Define a transformed rule. [def-asp-complement-rule]
                         ;  (begin (display alt_name) (fresh () (trans-conde exp ...) (update-F `name argv)))
                         ; ) 
-                         (if (< n 0)
+                         (if (= n -1)
                           1
-                          n) (adjoin-set 
+                          n) 
+                         (if (= n -1)
+                          f 
+                          (adjoin-set 
                                         (make-record
                                           (list `name key)
-                                          n) f) c)
+                                          n) f)
+                         )
+                          c)
                       )
                     )
                   )
@@ -530,7 +613,7 @@
     ((no (name args ...))
       (lambdag@ (n f c)
         (let ((newN (+ 1 n)))
-          (display newN)
+          ; (display newN)
           ((name args ...) newN f c)
         )
       )
