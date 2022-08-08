@@ -301,7 +301,15 @@
                     ;(cout "remove var:" (car bounded-vars) "from S:" S nl)
                     ;(cout "removed S:" (remove-var (car bounded-vars) S) nl)
                     ;(cout "Old S:" G nl)
-                    (let ((domain-of-vars (take #f (lambdaf@ () ((fresh (tmp) (no g0) (no (== tmp bounded-vars)) (last-step '() tmp)) n f (list G F G))))))
+                    (let ((domain-of-vars 
+                      (take #f (lambdaf@ () 
+                        ((fresh (tmp) 
+                          (no g0) 
+                          (no (== tmp bounded-vars)) 
+                          (lambdag@ (n f c)
+                            (let ((z ((reify tmp) c)))
+                              (choice z empty-f)))) 
+                         n f (list G F G))))))
                       ((helper bounded-vars domain-of-vars) n f c)
                       ;((fresh-t (x ...) g ...) n f (list (ext-s (car bounded-vars) (car domain-of-vars) G) F G))
                     ))))))
@@ -375,7 +383,9 @@
         (tmp) 
         (apply (eval goal) vars)
         (== tmp vars) 
-        (last-step '() tmp)) 
+        (lambdag@ (n f c)
+          (let ((z ((reify tmp) c)))
+                  (choice z empty-f))))
         -2 `() `(() () 0))))
 )
 
@@ -392,7 +402,7 @@
         (lambda (g values)
           (lambdag@(nn ff cc : SS FF GG)
             (if (null? values)
-                (list S F G)
+                (list SS FF GG)
                 (inc
                   (mplus*
                     ;(bind* 0 ff 
@@ -416,14 +426,15 @@
             ; If the arity is 0, we don't need to ground-values, we can run the
             ; goal directly.
             (let ((vals (ground-values (get-key g) (construct-var-list (get-value g)))))
-            (inc
+            ;(inc
               ;(mplus*
               ; (bind* -1 '() ((apply (eval (get-key g)) (construct-var-list (get-value g))) -1 '() final-c) (last-step (cdr tracking-set) x))
               ; (bind* -1 frame ((helper g vals) -1 frame final-c) (last-step (cdr tracking-set) x))
-              (bind* 0 frame ((helper g vals) 0 frame final-c) (last-step (cdr tracking-set) x))
+              (bind* -1 frame ((helper g vals) -1 frame final-c) (last-step (cdr tracking-set) x))
               ;(bind* 1 frame ((helper g vals) 1 frame final-c) (last-step (cdr tracking-set) x))
               ;)
-            ))
+            ;)
+            )
             (let ((z ((reify x) final-c)))
                   (choice z empty-f))
           )
@@ -552,7 +563,7 @@
                               (walk* arg S)) argv) ))
                 (let ((result (element-of-set? (list `name key) F)))
                   (if (and result #t)
-                    (cond ((< n 0) (begin ;(cout "nmr_check:" `name key nl) 
+                    (cond ((= n -1) (begin ;(cout "nmr_check:" `name key nl) 
                                     (unit n f c)))
                           ((and (even? (get-value result)) (even? n)) (unit n f c))
                           ((and (even? (get-value result)) (odd? n)) (mzero))
@@ -577,8 +588,8 @@
                             (else (choice c mzero)))
                         )
                         ; Expand calling stack.
-                        ((cond ((= n -1) (begin (fresh () (global-checking exp ... (name args ...)) (update-F `name argv)) ))
-                              ((= n -2) (begin (fresh () (remove-negation exp ...) (update-F `name argv))))
+                        ((cond ((= n -1) (begin (fresh () (global-checking exp ... (name args ...)) ) ))
+                              ((= n -2) (begin (fresh () (remove-negation exp ...))))
                               ((even? n) (begin (fresh () exp ... (update-F `name argv))))
                               (else (begin (fresh () (trans-conde exp ...) (update-F `name argv)))
                               ))
